@@ -16,17 +16,22 @@ continuous integration on every push and pull request.
 
 ## Table of contents
 
-1. [Features](#features)
-2. [Domain rules ported from the baseline](#domain-rules-ported-from-the-baseline)
-3. [Project layout](#project-layout)
-4. [Local setup and execution](#local-setup-and-execution)
-5. [Running the tests manually](#running-the-tests-manually)
-6. [API reference](#api-reference)
-7. [Docker](#docker)
-8. [Jenkins BUILD gate](#jenkins-build-gate)
-9. [GitHub Actions CI/CD](#github-actions-cicd)
-10. [How Jenkins and GitHub Actions fit together](#how-jenkins-and-github-actions-fit-together)
-11. [Branching and commit conventions](#branching-and-commit-conventions)
+- [ACEest Fitness \& Gym — DevOps Assignment 1](#aceest-fitness--gym--devops-assignment-1)
+  - [Table of contents](#table-of-contents)
+  - [Features](#features)
+  - [Domain rules ported from the baseline](#domain-rules-ported-from-the-baseline)
+  - [Project layout](#project-layout)
+  - [Local setup and execution](#local-setup-and-execution)
+    - [Configuration](#configuration)
+  - [Running the tests manually](#running-the-tests-manually)
+    - [What the suite covers](#what-the-suite-covers)
+  - [API reference](#api-reference)
+  - [Docker](#docker)
+  - [Jenkins BUILD gate](#jenkins-build-gate)
+    - [Setting up the job](#setting-up-the-job)
+  - [GitHub Actions CI/CD](#github-actions-cicd)
+  - [How Jenkins and GitHub Actions fit together](#how-jenkins-and-github-actions-fit-together)
+  - [Branching and commit conventions](#branching-and-commit-conventions)
 
 ---
 
@@ -97,7 +102,7 @@ blueprints stay thin.
 Requires Python 3.11 or newer.
 
 ```bash
-git clone https://github.com/<your-username>/aceest-fitness-devops.git
+git clone https://github.com/spaceman-dev/aceest-fitness-devops.git
 cd aceest-fitness-devops
 
 python3 -m venv .venv
@@ -247,20 +252,28 @@ docker rm -f aceest
 | Lint | `flake8 .` — style and syntax gate. |
 | Unit Tests | `pytest` with JUnit XML and coverage reports published to the build. |
 | Docker Build | Builds the `runtime` image tagged with the Jenkins build number. |
-| Container Smoke Test | Starts the image and polls `/api/health` before passing. |
+| Container Smoke Test | Starts the image, waits for `HEALTHCHECK` to report `healthy`, then asserts the calorie endpoint from inside the container. |
 
 ### Setting up the job
 
 ```bash
-docker run -d --name jenkins -p 8080:8080 -p 50000:50000 \
+docker run -d --name jenkins -p 8090:8080 -p 50000:50000 \
   -v jenkins_home:/var/jenkins_home \
   -v /var/run/docker.sock:/var/run/docker.sock \
   jenkins/jenkins:lts
 
+# The LTS image ships without python or the docker CLI, and the jenkins user
+# needs permission on the mounted socket.
+docker exec -u root jenkins bash -c \
+  'apt-get update -qq && apt-get install -y -qq python3 python3-venv curl docker.io'
+docker exec -u root jenkins bash -c \
+  'GID=$(stat -c "%g" /var/run/docker.sock); getent group "$GID" || groupadd -g "$GID" dockerhost; usermod -aG "$GID" jenkins'
+docker restart jenkins
+
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-1. Open <http://localhost:8080>, unlock with the password above and install the
+1. Open <http://localhost:8090>, unlock with the password above and install the
    suggested plugins (Git and Pipeline are required).
 2. **New Item → Pipeline**, name it `aceest-fitness-build`.
 3. Under **Pipeline**, choose *Pipeline script from SCM* → *Git*, enter the
@@ -271,8 +284,10 @@ docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 5. **Build Now** — the console output shows every stage; a green run means the
    commit passed the BUILD gate.
 
-The agent needs `python3`, `docker` and `curl` on its `PATH`. Mounting the Docker
-socket (as above) lets the containerised controller build images.
+Port 8090 is used above because 8080 is a common local conflict; adjust to taste.
+The smoke test probes the container through `docker inspect` and `docker exec`
+rather than a published port, so it passes whether the agent is the host or a
+container itself.
 
 ## GitHub Actions CI/CD
 
