@@ -5,13 +5,6 @@ toolchain: Git/GitHub for version control, Pytest for validation, Docker for
 packaging, **Jenkins** for the controlled BUILD gate and **GitHub Actions** for
 continuous integration on every push and pull request.
 
-> **Origin of the business logic.** The baseline scripts supplied with the
-> assignment (`Aceestver-*.py`) are Tkinter desktop applications, not web
-> services. Their *domain rules* — the per-program calorie factor, the BMI bands,
-> the weekly adherence tracking, the client/workout schema — were ported into
-> stateless HTTP endpoints. The rules are preserved verbatim; only the delivery
-> mechanism changed.
-
 ---
 
 ## Table of contents
@@ -19,7 +12,7 @@ continuous integration on every push and pull request.
 - [ACEest Fitness \& Gym — DevOps Assignment 1](#aceest-fitness--gym--devops-assignment-1)
   - [Table of contents](#table-of-contents)
   - [Features](#features)
-  - [Domain rules ported from the baseline](#domain-rules-ported-from-the-baseline)
+  - [Domain rules](#domain-rules)
   - [Project layout](#project-layout)
   - [Local setup and execution](#local-setup-and-execution)
     - [Configuration](#configuration)
@@ -39,8 +32,8 @@ continuous integration on every push and pull request.
 
 - **Client management** — enroll, read, update and delete gym clients with
   server-side validation on every field.
-- **Program catalogue** — the four training programs from the baseline, each with
-  its calorie factor, weekly workout chart and nutrition plan.
+- **Program catalogue** — four training programs, each with its calorie factor,
+  weekly workout chart and nutrition plan.
 - **Calorie targeting** — `daily kcal = body weight (kg) × program factor`.
 - **BMI and risk classification** — Underweight / Normal / Overweight / Obese.
 - **Weekly adherence tracking** — per-week percentages plus a derived summary
@@ -49,17 +42,20 @@ continuous integration on every push and pull request.
 - **Two interfaces over one domain layer** — a JSON REST API under `/api` and a
   server-rendered dashboard at `/`.
 
-## Domain rules ported from the baseline
+## Domain rules
 
-| Rule | Formula / values | Baseline source |
-| --- | --- | --- |
-| Daily calorie target | `int(weight_kg × factor)` | `Aceestver-1.1.py`, `Aceestver-2.2.1.py` |
-| Program factors | FL3 = 22, FL5 = 24, MG = 35, BG = 26 kcal/kg | `Aceestver-2.2.4.py` |
-| BMI | `weight_kg ÷ (height_m)²`, rounded to 1 dp | `Aceestver-2.2.4.py` |
-| BMI bands | `< 18.5` Underweight, `< 25` Normal, `< 30` Overweight, else Obese | `Aceestver-2.2.4.py` |
-| Adherence | integer percentage `0–100`, one record per week | `Aceestver-2.1.2.py` |
-| Workout types | Strength, Hypertrophy, Cardio, Mobility | `Aceestver-3.2.4.py` |
-| Site metrics | 150 user capacity, 10 000 sq ft, 250 break-even members | `Aceestver-1.0.py` |
+The rules below are implemented in `aceest/services.py` and `aceest/programs.py`,
+and each one is covered by a dedicated unit test.
+
+| Rule | Formula / values |
+| --- | --- |
+| Daily calorie target | `int(weight_kg × factor)` |
+| Program factors | FL3 = 22, FL5 = 24, MG = 35, BG = 26 kcal/kg |
+| BMI | `weight_kg ÷ (height_m)²`, rounded to 1 dp |
+| BMI bands | `< 18.5` Underweight, `< 25` Normal, `< 30` Overweight, else Obese |
+| Adherence | integer percentage `0–100`, one record per week |
+| Workout types | Strength, Hypertrophy, Cardio, Mobility |
+| Site metrics | 150 user capacity, 10 000 sq ft, 250 break-even members |
 
 ## Project layout
 

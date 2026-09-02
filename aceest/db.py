@@ -1,8 +1,7 @@
 """SQLite persistence layer.
 
-The schema mirrors the tables created by the desktop baseline
-(``clients`` / ``progress`` / ``workouts``) so the ported business rules keep the
-same shape. Every statement is parameterised - no string-built SQL.
+Three tables - ``clients`` / ``progress`` / ``workouts`` - hold everything the
+service stores. Every statement is parameterised; no string-built SQL.
 """
 
 from __future__ import annotations
