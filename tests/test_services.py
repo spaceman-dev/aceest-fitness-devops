@@ -1,4 +1,4 @@
-"""Unit tests for the pure business logic ported from the desktop baselines."""
+"""Unit tests for the pure business logic in ``aceest.services``."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from aceest.programs import PROGRAMS, get_program, list_programs
 
 
 class TestProgramCatalogue:
-    def test_catalogue_exposes_every_baseline_program(self):
+    def test_catalogue_exposes_every_program(self):
         assert set(PROGRAMS) == {"FL3", "FL5", "MG", "BG"}
         assert len(list_programs()) == 4
 
@@ -18,7 +18,7 @@ class TestProgramCatalogue:
         ("code", "factor"),
         [("FL3", 22), ("FL5", 24), ("MG", 35), ("BG", 26)],
     )
-    def test_calorie_factors_match_baseline(self, code, factor):
+    def test_calorie_factors(self, code, factor):
         assert PROGRAMS[code]["factor"] == factor
 
     def test_lookup_is_case_insensitive_and_trimmed(self):

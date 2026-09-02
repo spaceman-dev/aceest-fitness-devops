@@ -1,8 +1,7 @@
 """Training program catalogue for ACEest Fitness & Gym.
 
-Ported verbatim (business rules only) from the desktop baselines supplied with
-the assignment: ``Aceestver-1.1.py`` (workout/diet charts + ``calorie_factor``)
-and ``Aceestver-2.2.4.py`` (extended 5-day fat-loss and PPL variants).
+Each program carries the calorie factor used to derive a client's daily target,
+plus the weekly workout chart and nutrition plan shown on the dashboard.
 """
 
 from __future__ import annotations
@@ -94,7 +93,7 @@ PROGRAMS: dict[str, dict[str, Any]] = {
 
 WORKOUT_TYPES = ("Strength", "Hypertrophy", "Cardio", "Mobility")
 
-# Site metrics carried over from the baseline dashboard.
+# Capacity and break-even figures for the site, shown on the dashboard.
 SITE_METRICS = {
     "capacity_users": 150,
     "area_sq_ft": 10000,

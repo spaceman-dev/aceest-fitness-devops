@@ -1,11 +1,11 @@
 """Pure business logic for ACEest Fitness & Gym.
 
 Every function here is free of Flask and SQLite so that it can be unit tested in
-isolation. The rules are the ones defined by the desktop baselines:
+isolation. The rules it implements are:
 
-* daily calorie target  = weight (kg) x program factor  (``Aceestver-1.1.py``)
-* BMI                   = weight (kg) / height (m)^2    (``Aceestver-2.2.4.py``)
-* adherence             = weekly percentage, 0-100      (``Aceestver-2.2.1.py``)
+* daily calorie target  = weight (kg) x program factor
+* BMI                   = weight (kg) / height (m)^2
+* adherence             = weekly percentage, 0-100
 """
 
 from __future__ import annotations
@@ -151,7 +151,7 @@ def validate_duration(value: Any) -> int:
 
 
 def calculate_calories(weight_kg: Any, program: Any) -> int:
-    """Daily calorie target: ``weight x program factor`` (baseline formula)."""
+    """Daily calorie target: ``weight x program factor``."""
     weight = validate_weight_kg(weight_kg)
     factor = validate_program(program)["factor"]
     return int(weight * factor)
@@ -164,7 +164,7 @@ def calculate_bmi(weight_kg: Any, height_cm: Any) -> float:
 
 
 def classify_bmi(bmi: float) -> dict[str, str]:
-    """BMI band + risk note, matching the baseline ``show_bmi_info`` thresholds."""
+    """BMI band plus the risk note shown to the coach."""
     if bmi < 18.5:
         return {
             "category": "Underweight",

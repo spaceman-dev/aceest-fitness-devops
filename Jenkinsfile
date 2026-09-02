@@ -91,7 +91,7 @@ pipeline {
                         sleep 2
                     done
 
-                    echo "Verifying the calorie endpoint returns the baseline value..."
+                    echo "Verifying the calorie endpoint returns the expected value..."
                     docker exec "$CONTAINER" python -c "
 import json, urllib.request
 req = urllib.request.Request(
