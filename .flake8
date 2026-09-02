@@ -1,6 +1,8 @@
 [flake8]
 max-line-length = 100
-extend-exclude = .git,__pycache__,.venv,venv,build,dist
+# Globs, not literals: CI builds its virtualenv as .venv-ci, so a bare ".venv"
+# would let flake8 loose on site-packages.
+extend-exclude = .git,__pycache__,.venv*,venv*,env,build,dist,*.egg-info,reports
 extend-ignore = E203, W503
 per-file-ignores =
     tests/*: E501
