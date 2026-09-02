@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} &middot; ACEest Fitness{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h2>{{ client.name }}</h2>
+  <p class="muted">{{ program.name }} &middot; {{ program.description }}</p>
+  <dl class="profile">
+    <div><dt>Age</dt><dd>{{ client.age }}</dd></div>
+    <div><dt>Height</dt><dd>{{ client.height_cm }} cm</dd></div>
+    <div><dt>Weight</dt><dd>{{ client.weight_kg }} kg</dd></div>
+    <div><dt>BMI</dt><dd>{{ client.bmi }}</dd></div>
+    <div><dt>Calorie target</dt><dd>{{ client.calories }} kcal/day</dd></div>
+    <div><dt>Target adherence</dt><dd>{{ client.target_adherence }}%</dd></div>
+    <div><dt>Membership</dt><dd>{{ client.membership_status }}</dd></div>
+  </dl>
+</section>
+
+<section class="split">
+  <div class="card">
+    <h2>Log weekly adherence</h2>
+    <form method="post" action="{{ url_for('web.add_progress', name=client.name) }}" class="stack">
+      <label>Week
+        <input type="text" name="week" required placeholder="W1" value="W{{ summary.weeks_logged + 1 }}">
+      </label>
+      <label>Adherence (%)
+        <input type="number" name="adherence" required min="0" max="100" value="80">
+      </label>
+      <button type="submit">Record week</button>
+    </form>
+
+    <h3>Summary</h3>
+    <ul class="summary">
+      <li>Weeks logged: <strong>{{ summary.weeks_logged }}</strong></li>
+      <li>Average adherence: <strong>{{ summary.average_adherence }}%</strong></li>
+      <li>Trend: <strong>{{ summary.trend }}</strong></li>
+      <li>Status: <strong>{{ summary.status }}</strong></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Adherence history</h2>
+    {% if progress %}
+      <ul class="bars">
+        {% for entry in progress %}
+          <li>
+            <span class="bar-label">{{ entry.week }}</span>
+            <span class="bar"><span class="bar-fill" style="width: {{ entry.adherence }}%"></span></span>
+            <span class="bar-value">{{ entry.adherence }}%</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No weeks logged yet.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="split">
+  <div class="card">
+    <h2>Weekly workout</h2>
+    <p class="plan">{{ program.workout }}</p>
+  </div>
+  <div class="card">
+    <h2>Nutrition plan</h2>
+    <p class="plan">{{ program.diet }}</p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Logged sessions</h2>
+  {% if workouts %}
+    <table class="roster">
+      <thead><tr><th>Date</th><th>Type</th><th>Minutes</th><th>Notes</th></tr></thead>
+      <tbody>
+        {% for workout in workouts %}
+          <tr>
+            <td>{{ workout.date }}</td>
+            <td>{{ workout.workout_type }}</td>
+            <td>{{ workout.duration_min }}</td>
+            <td>{{ workout.notes }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">
+      No sessions logged. Post one to
+      <code>/api/clients/{{ client.name }}/workouts</code>.
+    </p>
+  {% endif %}
+</section>
+{% endblock %}
