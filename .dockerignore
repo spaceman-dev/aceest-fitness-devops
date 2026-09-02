@@ -1,0 +1,24 @@
+# Keep the build context small and free of secrets / local state.
+# NOTE: tests/ and requirements-dev.txt are intentionally NOT excluded - the
+# `test` build stage needs them. They never reach the runtime stage.
+.git
+.github
+.gitignore
+.venv
+venv
+env
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.coverage
+htmlcov
+coverage.xml
+*.db
+*.sqlite3
+.DS_Store
+.idea
+.vscode
+Jenkinsfile
+README.md
+docs
