@@ -70,23 +70,38 @@ pipeline {
 
         stage('Container Smoke Test') {
             steps {
+                // Probes run inside the container, so this works whether the
+                // Jenkins agent is the host or itself a container.
                 sh '''
                     set -eu
-                    CONTAINER=$(docker run -d -p 0:5000 "$IMAGE_NAME:$IMAGE_TAG")
+                    CONTAINER=$(docker run -d "$IMAGE_NAME:$IMAGE_TAG")
                     trap 'docker rm -f "$CONTAINER" >/dev/null 2>&1 || true' EXIT
-                    PORT=$(docker port "$CONTAINER" 5000/tcp | head -1 | cut -d: -f2)
 
-                    for attempt in $(seq 1 20); do
-                        if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null; then
-                            echo "Health check passed on attempt $attempt"
-                            exit 0
+                    for attempt in $(seq 1 30); do
+                        STATE=$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER")
+                        if [ "$STATE" = "healthy" ]; then
+                            echo "Container reported healthy on attempt $attempt"
+                            break
+                        fi
+                        if [ "$attempt" -eq 30 ]; then
+                            echo "Container never became healthy (last state: $STATE)"
+                            docker logs "$CONTAINER"
+                            exit 1
                         fi
                         sleep 2
                     done
 
-                    echo "Container failed health check"
-                    docker logs "$CONTAINER"
-                    exit 1
+                    echo "Verifying the calorie endpoint returns the baseline value..."
+                    docker exec "$CONTAINER" python -c "
+import json, urllib.request
+req = urllib.request.Request(
+    'http://127.0.0.1:5000/api/calories',
+    data=json.dumps({'weight_kg': 80, 'program': 'MG'}).encode(),
+    headers={'Content-Type': 'application/json'})
+body = json.load(urllib.request.urlopen(req, timeout=5))
+assert body['calories'] == 2800, body
+print('calorie endpoint OK:', body)
+"
                 '''
             }
         }
