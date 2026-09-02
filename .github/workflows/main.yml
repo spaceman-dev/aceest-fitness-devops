@@ -1,0 +1,153 @@
+name: ACEest Fitness CI/CD
+
+# Continuous Integration gate: every push and every pull request to main must
+# pass lint -> unit tests -> image build -> tests inside the container.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: aceest-fitness
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build-and-lint:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Byte-compile the application (syntax gate)
+        run: python -m compileall -q app.py aceest tests
+
+      - name: Lint with flake8
+        run: flake8 .
+
+      - name: Run unit tests on the host
+        run: pytest --junitxml=reports/junit.xml --cov-report=xml:reports/coverage.xml
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-reports
+          path: reports/
+          if-no-files-found: ignore
+
+  docker-build:
+    name: Docker Image Assembly
+    runs-on: ubuntu-latest
+    needs: build-and-lint
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the image runs as a non-root user
+        run: |
+          user=$(docker run --rm --entrypoint id ${{ env.IMAGE_NAME }}:${{ github.sha }} -un)
+          echo "Container user: $user"
+          test "$user" = "aceest"
+
+      - name: Export image for downstream jobs
+        run: docker save ${{ env.IMAGE_NAME }}:${{ github.sha }} -o /tmp/image.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/image.tar
+          retention-days: 1
+
+  containerized-tests:
+    name: Automated Testing (in container)
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:test
+          cache-from: type=gha
+
+      - name: Execute the Pytest suite inside the container
+        run: docker run --rm ${{ env.IMAGE_NAME }}:test pytest
+
+      - name: Download runtime image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load runtime image
+        run: docker load -i /tmp/image.tar
+
+      - name: Smoke test the running container
+        run: |
+          docker run -d --name aceest -p 5000:5000 ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:5000/api/health; then
+              echo "Health check passed on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              echo "Container never became healthy"
+              docker logs aceest
+              exit 1
+            fi
+            sleep 2
+          done
+
+          echo "Exercising the calorie endpoint..."
+          curl -fsS -X POST http://127.0.0.1:5000/api/calories \
+            -H 'Content-Type: application/json' \
+            -d '{"weight_kg": 80, "program": "MG"}' | tee /tmp/calories.json
+          grep -Eq '"calories":[[:space:]]*2800' /tmp/calories.json
+
+          docker rm -f aceest
