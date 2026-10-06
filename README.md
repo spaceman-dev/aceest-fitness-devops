@@ -239,7 +239,7 @@ docker rm -f aceest
 
 ## Jenkins BUILD gate
 
-`Jenkinsfile` is a declarative pipeline with five stages, each an abort point:
+`Jenkinsfile` is a declarative pipeline with eight stages, each an abort point:
 
 | Stage | Action |
 | --- | --- |
@@ -249,6 +249,8 @@ docker rm -f aceest
 | Unit Tests | `pytest` with JUnit XML and coverage reports published to the build. |
 | Docker Build | Builds the `runtime` image tagged with the Jenkins build number. |
 | Container Smoke Test | Starts the image, waits for `HEALTHCHECK` to report `healthy`, then asserts the calorie endpoint from inside the container. |
+| Deploy to Staging | Replaces the staging container with the new image and verifies it serves correctly. |
+| Promote to Production | Only after staging passes, and only from `main` — replaces the production container and verifies it. |
 
 ### Setting up the job
 
@@ -284,6 +286,58 @@ Port 8090 is used above because 8080 is a common local conflict; adjust to taste
 The smoke test probes the container through `docker inspect` and `docker exec`
 rather than a published port, so it passes whether the agent is the host or a
 container itself.
+
+## Deployment environments
+
+A green build is delivered to two long-lived environments on the Jenkins host.
+Both run the same image and differ only in port, container name and data volume.
+
+| Environment | URL | Container | Data volume | Receives a build when |
+| --- | --- | --- | --- | --- |
+| Staging | <http://localhost:5001> | `aceest-staging` | `aceest-staging-data` | Every green build |
+| Production | <http://localhost:5000> | `aceest-prod` | `aceest-prod-data` | Staging verified **and** the build is from `main` |
+
+The promotion rule is the point: production never receives an image that staging
+has not already started, health-checked and answered a real request from. If
+staging fails, the pipeline aborts and production keeps serving the previous
+release.
+
+> On macOS, port 5000 is held by the AirPlay Receiver (`ControlCenter`), so the
+> production URL answers 403 there. Either turn the receiver off in
+> **System Settings → General → AirDrop & Handoff**, or override `PROD_PORT` in
+> the pipeline. Linux hosts, including the lab VM, are unaffected.
+
+Each deployment:
+
+- **replaces** the running container, and frees the port first, so redeploying
+  is idempotent rather than a port conflict;
+- **restarts automatically** (`--restart unless-stopped`), so an environment
+  survives a Docker or host restart;
+- **keeps its database in a named volume**, so client data persists across
+  releases and the two environments never share state;
+- **is verified after the fact** — the stage polls the container's `HEALTHCHECK`
+  until it reports `healthy`, then asserts `/api/calories` returns 2800 kcal for
+  80 kg on the MG program. A release that starts but misbehaves still fails the
+  build.
+
+Verification runs through `docker exec` rather than the published port, so it
+behaves identically whether the Jenkins agent is the host or a container itself.
+
+```bash
+# Check either environment by hand
+curl http://localhost:5001/api/health    # staging
+curl http://localhost:5000/api/health    # production
+
+# Roll production back to an earlier build (images are tagged per build number)
+docker rm -f aceest-prod
+docker run -d --name aceest-prod --restart unless-stopped \
+  -p 5000:5000 -v aceest-prod-data:/data aceest-fitness:<previous-build-number>
+```
+
+Both environments are hosted by Jenkins rather than GitHub Actions, because an
+Actions runner is torn down at the end of every job and cannot hold a URL open.
+That is the same reason Jenkins owns the release: it is the only persistent,
+organisation-controlled host in the pipeline.
 
 ## GitHub Actions CI/CD
 
